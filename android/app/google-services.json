@@ -1,0 +1,40 @@
+{
+  "project_info": {
+    "project_number": "158860450709",
+    "firebase_url": "https://smart-onitor-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "smart-onitor",
+    "storage_bucket": "smart-onitor.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:158860450709:android:bb2fabefcc0d149ad6749c",
+        "android_client_info": {
+          "package_name": "com.example.smartonitor"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "158860450709-glt1mneftf81vht66481euq84lmoaf88.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyClqgNjNXEHLELDe5u5BJjcMsg1qJf95bQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "158860450709-glt1mneftf81vht66481euq84lmoaf88.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
