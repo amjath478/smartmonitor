@@ -1,4 +1,40 @@
-﻿import 'package:flutter/foundation.dart';
+﻿// Current Realtime Database structure (added by ESP; some fields not in models):
+// users/
+// └── {uid}/
+//     └── devices/
+//         └── {espId}/
+//             └── appliances/
+//                 └── {applianceName}/
+//                     │
+//                     ├── config/
+//                     │   ├── voltage:      {float}   // mains voltage, e.g. 230.0
+//                     │   ├── calibration:  {float}   // SCT multiplier, e.g. 50.0
+//                     │   ├── peakCurrent:  {float}   // amps threshold for peak flag
+//                     │   ├── gpioPin:      {int}     // ESP32 ADC pin number
+//                     │   └── enabled:      {bool}    // true = active, false = skip
+//                     │
+//                     ├── live/
+//                     │   ├── current:      {float}   // RMS current in amps
+//                     │   ├── power:        {float}   // watts = voltage × current
+//                     │   ├── peak:         {bool}    // true if current >= peakCurrent
+//                     │   └── timestamp:    {int}     // epoch time of last update (IST)
+//                     │
+//                     ├── stats/
+//                     │   ├── todayEnergy:    {float}   // kWh accumulated today
+//                     │   ├── monthEnergy:    {float}   // kWh accumulated this month
+//                     │   ├── LastCalcTime:   {int}     // epoch time of last calculation
+//                     │   ├── lastResetDay:   {string}  // YYYY-MM-DD of last daily reset
+//                     │   └── lastResetMonth: {string}  // YYYY-MM of last monthly reset
+//                     │
+//                     └── history/
+//                         ├── daily/
+//                         │   └── {YYYY-MM-DD}: {float} // kWh total for that day
+//                         └── monthly/
+//                             └── {YYYY-MM}:    {float} // kWh total for that month
+//
+// Fields may be added by ESP and not represented in models; keep this comment as a reference.
+
+import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import '../models/appliance.dart';
