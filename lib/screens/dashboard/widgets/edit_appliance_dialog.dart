@@ -1,15 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../services/firebase_service.dart';
 import '../../../models/appliance.dart';
+import '../../../services/firebase_service.dart';
 
 class EditApplianceDialog extends StatefulWidget {
   final Appliance appliance;
 
-  const EditApplianceDialog({
-    super.key,
-    required this.appliance,
-  });
+  const EditApplianceDialog({super.key, required this.appliance});
 
   @override
   State<EditApplianceDialog> createState() => _EditApplianceDialogState();
@@ -17,121 +14,148 @@ class EditApplianceDialog extends StatefulWidget {
 
 class _EditApplianceDialogState extends State<EditApplianceDialog> {
   final _formKey = GlobalKey<FormState>();
-  final _deviceIdController = TextEditingController();
-  final _applianceNameController = TextEditingController();
+
+  late TextEditingController _nameController;
+  late TextEditingController _voltageController;
+  late TextEditingController _calibrationController;
+  late TextEditingController _peakCurrentController;
+  late TextEditingController _gpioPinController;
+
+  bool _enabled = true;
   bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _deviceIdController.text = widget.appliance.deviceId;
-    _applianceNameController.text = widget.appliance.id;
+
+    final config = widget.appliance.config;
+
+    _nameController =
+        TextEditingController(text: widget.appliance.name);
+    _voltageController =
+        TextEditingController(text: config.voltage.toString());
+    _calibrationController =
+        TextEditingController(text: config.calibration.toString());
+    _peakCurrentController =
+        TextEditingController(text: config.peakCurrent.toString());
+    _gpioPinController =
+        TextEditingController(text: config.gpioPin.toString());
+    _enabled = config.enabled;
   }
 
   @override
   void dispose() {
-    _deviceIdController.dispose();
-    _applianceNameController.dispose();
+    _nameController.dispose();
+    _voltageController.dispose();
+    _calibrationController.dispose();
+    _peakCurrentController.dispose();
+    _gpioPinController.dispose();
     super.dispose();
   }
 
   Future<void> _updateAppliance() async {
-    if (_formKey.currentState!.validate()) {
-      setState(() {
-        _isLoading = true;
-      });
+    if (!_formKey.currentState!.validate()) return;
 
-      final firebaseService = context.read<FirebaseService>();
-      final newDeviceId = _deviceIdController.text.trim();
-      final newApplianceName = _applianceNameController.text.trim();
+    setState(() => _isLoading = true);
 
-      // Only update if something changed
-      if (newDeviceId != widget.appliance.deviceId || 
-          newApplianceName != widget.appliance.id) {
-        
-        final success = await firebaseService.updateAppliance(
-          widget.appliance.deviceId,
-          widget.appliance.id,
-          newDeviceId,
-          newApplianceName,
-        );
+    final firebaseService = context.read<FirebaseService>();
 
-        setState(() {
-          _isLoading = false;
-        });
+    final voltage =
+        double.tryParse(_voltageController.text.trim()) ?? 230.0;
+    final calibration =
+        double.tryParse(_calibrationController.text.trim()) ?? 1.0;
+    final peakCurrent =
+        double.tryParse(_peakCurrentController.text.trim()) ?? 0.0;
+    final gpioPin =
+        int.tryParse(_gpioPinController.text.trim()) ?? 0;
 
-        if (success && mounted) {
-          Navigator.of(context).pop();
-        } else if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Failed to update appliance. Please try again.'),
-            ),
-          );
-        }
-      } else {
-        // Nothing changed, just close the dialog
-        setState(() {
-          _isLoading = false;
-        });
-        Navigator.of(context).pop();
-      }
+    final deviceId = widget.appliance.deviceId!;
+    final applianceId = widget.appliance.id;
+
+    try {
+      await firebaseService.updateApplianceConfig(
+        deviceId: deviceId,
+        applianceId: applianceId,
+        voltage: voltage,
+        calibration: calibration,
+        peakCurrent: peakCurrent,
+        gpioPin: gpioPin,
+        enabled: _enabled,
+      );
+
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Update failed')),
+      );
     }
+
+    setState(() => _isLoading = false);
   }
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Edit Appliance'),
-      content: Form(
-        key: _formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextFormField(
-              controller: _deviceIdController,
-              decoration: const InputDecoration(
-                labelText: 'Device ID (ESP ID)',
-                prefixIcon: Icon(Icons.router),
+      title: const Text('Edit Appliance Config'),
+      content: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              TextFormField(
+                controller: _nameController,
+                readOnly: true,
+                decoration: const InputDecoration(
+                  labelText: 'Appliance Name (Read Only)',
+                ),
               ),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter device ID';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _applianceNameController,
-              decoration: const InputDecoration(
-                labelText: 'Appliance Name',
-                prefixIcon: Icon(Icons.electrical_services),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _voltageController,
+                keyboardType: TextInputType.number,
+                decoration:
+                    const InputDecoration(labelText: 'Voltage (V)'),
               ),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter appliance name';
-                }
-                return null;
-              },
-            ),
-          ],
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _calibrationController,
+                keyboardType: TextInputType.number,
+                decoration:
+                    const InputDecoration(labelText: 'Calibration'),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _peakCurrentController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                    labelText: 'Peak Current (A)'),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _gpioPinController,
+                keyboardType: TextInputType.number,
+                decoration:
+                    const InputDecoration(labelText: 'GPIO Pin'),
+              ),
+              SwitchListTile(
+                title: const Text('Enabled'),
+                value: _enabled,
+                onChanged: (v) => setState(() => _enabled = v),
+              ),
+            ],
+          ),
         ),
       ),
       actions: [
         TextButton(
-          onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
+          onPressed: _isLoading ? null : () => Navigator.pop(context),
           child: const Text('Cancel'),
         ),
         FilledButton(
           onPressed: _isLoading ? null : _updateAppliance,
           child: _isLoading
-              ? const SizedBox(
-                  height: 20,
-                  width: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('Save'),
+              ? const CircularProgressIndicator()
+              : const Text('Update'),
         ),
       ],
     );

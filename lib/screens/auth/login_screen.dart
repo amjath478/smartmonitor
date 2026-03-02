@@ -195,12 +195,14 @@ class _LoginScreenState extends State<LoginScreen> {
       body: SafeArea(
         child: Consumer<AuthService>(
           builder: (context, authService, child) {
-            return Padding(
-              padding: const EdgeInsets.all(24.0),
+            // wrap form in a scroll view to avoid overflow when keyboard opens
+            final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+            return SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(24, 24, 24, bottomInset + 24),
               child: Form(
                 key: _formKey,
                 child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Icon(

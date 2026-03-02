@@ -153,8 +153,6 @@ import 'screens/auth/login_screen.dart';
 import 'screens/auth/register_screen.dart';
 import 'screens/auth/forgot_password_screen.dart';
 import 'screens/dashboard/dashboard_screen.dart';
-import 'screens/dashboard/widgets/add_appliance_dialog.dart';
-import 'screens/dashboard/widgets/edit_appliance_dialog.dart';
 import 'theme/app_theme.dart';
 
 void main() async {

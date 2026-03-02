@@ -349,7 +349,7 @@ class DashboardScreen extends StatelessWidget {
               onPressed: () async {
                 Navigator.of(context).pop();
                 final success = await firebaseService.deleteAppliance(
-                  appliance.deviceId,
+                  appliance.deviceId ?? '',
                   appliance.id,
                 );
                 
