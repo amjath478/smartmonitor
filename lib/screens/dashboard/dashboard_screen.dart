@@ -165,6 +165,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
 import '../../services/firebase_service.dart';
+import '../../services/peak_monitor_service.dart';
+import '../../services/local_notification_service.dart';
 import '../../models/appliance.dart';
 import '../appliance/appliance_history_screen.dart';
 import 'widgets/appliance_card.dart';
@@ -172,8 +174,31 @@ import 'widgets/peak_warning_banner.dart';
 import 'widgets/add_appliance_dialog.dart';
 import 'widgets/edit_appliance_dialog.dart';
 
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
+
+  @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  PeakMonitorService? _monitor;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final firebaseService = context.read<FirebaseService>();
+      _monitor = PeakMonitorService(firebaseService, LocalNotificationService());
+      _monitor?.start();
+    });
+  }
+
+  @override
+  void dispose() {
+    _monitor?.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
