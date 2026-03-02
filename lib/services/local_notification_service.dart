@@ -47,8 +47,9 @@ class LocalNotificationService {
   /// Display a peak alert notification.  This is the isolated hook that can
   /// later be replaced with an FCM send operation without changing the
   /// monitoring logic.
-  Future<void> triggerPeakAlert(String applianceName) async {
-    debugPrint('triggerPeakAlert called for $applianceName');
+  /// [deviceId] and [applianceName].
+  Future<void> triggerPeakAlert(String deviceId, String applianceName) async {
+    debugPrint('triggerPeakAlert called for $applianceName (device $deviceId)');
     const androidDetails = AndroidNotificationDetails(
       'peak_alerts',
       'Peak Alerts',
@@ -61,9 +62,10 @@ class LocalNotificationService {
     final platformDetails = NotificationDetails(android: androidDetails, iOS: darwinDetails, macOS: darwinDetails);
 
     await _plugin.show(
-      applianceName.hashCode,
-      '⚠️ Peak Current Warning',
-      applianceName,
+      // use a hash of both names to avoid collisions across devices
+      (deviceId + applianceName).hashCode,
+      '⚠️ $applianceName on $deviceId',
+      '',
       platformDetails,
     );
   }

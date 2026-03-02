@@ -17,7 +17,7 @@ class PeakMonitorService {
   final FirebaseService _firebase;
   final LocalNotificationService _notifier;
 
-  /// last time we issued an alert for each appliance id
+  /// last time we issued an alert for each appliance name
   final Map<String, DateTime> _lastAlert = {};
 
   StreamSubscription? _deviceSub;
@@ -43,24 +43,26 @@ class PeakMonitorService {
     final now = DateTime.now();
     debugPrint('PeakMonitorService received ${devices.length} devices');
     for (final device in devices) {
+      final devId = device.id;
       for (final app in device.appliances) {
-        final name = app.id;
+        final name = app.name; // user‑readable
         final current = app.live.current;
         final peak = app.config.peakCurrent;
         final enabled = app.config.enabled;
 
-        debugPrint('Checking appliance $name: current=$current peak=$peak enabled=$enabled');
+        debugPrint('Checking appliance $name (device $devId): current=$current peak=$peak enabled=$enabled');
 
         if (!enabled) continue;
         if (current <= peak) continue;
 
         final last = _lastAlert[name];
-        if (last != null && now.difference(last).inSeconds < 60) continue;
+        // use 5‑minute cooldown to avoid repeated alerts for same appliance
+        if (last != null && now.difference(last).inMinutes < 5) continue;
 
         // passed checks, fire notification
-        debugPrint('Peak exceeded for $name, triggering alert');
+        debugPrint('Peak exceeded for $name on device $devId, triggering alert');
         _lastAlert[name] = now;
-        _notifier.triggerPeakAlert(name);
+        _notifier.triggerPeakAlert(devId, name);
       }
     }
   }
