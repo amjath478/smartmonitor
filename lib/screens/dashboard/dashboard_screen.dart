@@ -10,6 +10,7 @@ import '../profile/profile_screen.dart';
 import 'widgets/appliance_card.dart';
 import 'widgets/peak_warning_banner.dart';
 import 'widgets/add_appliance_dialog.dart';
+import 'widgets/edit_appliance_dialog.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -167,6 +168,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                         ),
                                       );
                                     },
+                                    onEdit: () {
+                                      showDialog(
+                                        context: context,
+                                        builder: (context) => EditApplianceDialog(
+                                          appliance: appliance,
+                                        ),
+                                      );
+                                    },
+                                    onDelete: () {
+                                      _showDeleteDialog(
+                                          context, firebaseService, appliance);
+                                    },
                                   );
                                 },
                                 childCount: allAppliances.length,
@@ -192,6 +205,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
         },
         child: const Icon(Icons.add),
       ),
+    );
+  }
+
+  void _showDeleteDialog(BuildContext context, FirebaseService firebaseService, Appliance appliance) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Delete Appliance'),
+          content: Text('Are you sure you want to delete "${appliance.id}"?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                final success = await firebaseService.deleteAppliance(
+                  appliance.deviceId ?? '',
+                  appliance.id,
+                );
+
+                if (!success && context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Failed to delete appliance. Please try again.'),
+                    ),
+                  );
+                }
+              },
+              child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
     );
   }
 }

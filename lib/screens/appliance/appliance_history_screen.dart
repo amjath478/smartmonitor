@@ -5,6 +5,7 @@ import 'package:fl_chart/fl_chart.dart';
 import '../../services/firebase_service.dart';
 import '../../models/appliance.dart';
 import '../../theme/app_theme.dart';
+import '../carbon_impact_screen.dart';
 
 class ApplianceHistoryScreen extends StatefulWidget {
   final Appliance appliance;
@@ -163,27 +164,54 @@ class _ApplianceHistoryScreenState extends State<ApplianceHistoryScreen> {
 
                       return Padding(
                         padding: const EdgeInsets.symmetric(vertical: 8),
-                        child: LayoutBuilder(
-                          builder: (context, constraints) {
-                            if (constraints.maxWidth > 600) {
-                              return Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(child: statusCard),
-                                  const SizedBox(width: 12),
-                                  Expanded(child: forecastCard),
-                                ],
-                              );
-                            } else {
-                              return Column(
-                                children: [
-                                  statusCard,
-                                  const SizedBox(height: 8),
-                                  forecastCard,
-                                ],
-                              );
-                            }
-                          },
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            LayoutBuilder(
+                              builder: (context, constraints) {
+                                if (constraints.maxWidth > 600) {
+                                  return Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Expanded(child: statusCard),
+                                      const SizedBox(width: 12),
+                                      Expanded(child: forecastCard),
+                                    ],
+                                  );
+                                } else {
+                                  return Column(
+                                    children: [
+                                      statusCard,
+                                      const SizedBox(height: 8),
+                                      forecastCard,
+                                    ],
+                                  );
+                                }
+                              },
+                            ),
+                            const SizedBox(height: 12),
+                            Center(
+                              child: ElevatedButton.icon(
+                                icon: const Icon(Icons.eco),
+                                label: const Text('Environmental Impact'),
+                                style: ElevatedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 24, vertical: 12),
+                                ),
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => CarbonImpactScreen(
+                                        deviceId: widget.appliance.deviceId ?? '',
+                                        applianceId: widget.appliance.id,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
                         ),
                       );
                     },
