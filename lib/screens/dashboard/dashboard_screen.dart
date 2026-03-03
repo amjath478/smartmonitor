@@ -5,6 +5,7 @@ import '../../services/firebase_service.dart';
 import '../../services/peak_monitor_service.dart';
 import '../../services/local_notification_service.dart';
 import '../../models/appliance.dart';
+import '../../widgets/ai_chat_sheet.dart';
 import '../appliance/appliance_history_screen.dart';
 import '../profile/profile_screen.dart';
 import 'widgets/appliance_card.dart';
@@ -19,12 +20,25 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
+class _DashboardScreenState extends State<DashboardScreen> with TickerProviderStateMixin {
   PeakMonitorService? _monitor;
+  late AnimationController _pulseController;
+  late Animation<double> _pulseAnimation;
 
   @override
   void initState() {
     super.initState();
+    
+    // Initialize pulse animation
+    _pulseController = AnimationController(
+      duration: const Duration(seconds: 2),
+      vsync: this,
+    )..repeat(reverse: true);
+
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.15).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final firebaseService = context.read<FirebaseService>();
       _monitor = PeakMonitorService(firebaseService, LocalNotificationService());
@@ -34,6 +48,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   void dispose() {
+    _pulseController.dispose();
     _monitor?.dispose();
     super.dispose();
   }
@@ -196,15 +211,60 @@ class _DashboardScreenState extends State<DashboardScreen> {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          showDialog(
-            context: context,
-            builder: (context) => const AddApplianceDialog(),
-          );
-        },
-        child: const Icon(Icons.add),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          // Chat button with pulse/glow
+          ScaleTransition(
+            scale: _pulseAnimation,
+            child: Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  colors: [
+                    Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                    Theme.of(context).colorScheme.secondary.withOpacity(0.1),
+                  ],
+                ),
+              ),
+              child: FloatingActionButton(
+                heroTag: 'chatFab',
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+                onPressed: _openAIChatSheet,
+                child: const Icon(Icons.smart_toy),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Original add appliance button
+          FloatingActionButton(
+            heroTag: 'addFab',
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (context) => const AddApplianceDialog(),
+              );
+            },
+            child: const Icon(Icons.add),
+          ),
+        ],
       ),
+    );
+  }
+
+  void _openAIChatSheet() {
+    final authService = context.read<AuthService>();
+    final userId = authService.currentUser?.uid ?? 'anonymous';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => AIChatSheet(userId: userId),
     );
   }
 
