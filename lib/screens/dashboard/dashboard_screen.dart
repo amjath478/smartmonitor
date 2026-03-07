@@ -12,6 +12,7 @@ import 'widgets/appliance_card.dart';
 import 'widgets/peak_warning_banner.dart';
 import 'widgets/add_appliance_dialog.dart';
 import 'widgets/edit_appliance_dialog.dart';
+import 'budget_settings_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -62,6 +63,17 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
           PopupMenuButton(
             icon: const Icon(Icons.account_circle),
             itemBuilder: (context) => [
+              PopupMenuItem(
+                child: const Text('Budget Settings'),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const BudgetSettingsScreen(),
+                    ),
+                  );
+                },
+              ),
               PopupMenuItem(
                 child: const Text('Profile'),
                 onTap: () {

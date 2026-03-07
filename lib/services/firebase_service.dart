@@ -1,6 +1,8 @@
 ﻿// Current Realtime Database structure (added by ESP; some fields not in models):
 // users/
 // └── {uid}/
+//     ├── gmail:      {string}   // user email address (auto-saved on registration)
+//     │
 //     └── devices/
 //         └── {espId}/
 //             └── appliances/

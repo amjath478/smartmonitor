@@ -1,9 +1,11 @@
 
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
 
 class AuthService extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final DatabaseReference _database = FirebaseDatabase.instance.ref();
   User? _user;
   bool _isLoading = false;
   String? _error;
@@ -59,10 +61,19 @@ class AuthService extends ChangeNotifier {
       _setLoading(true);
       _setError(null);
       
-      await _auth.createUserWithEmailAndPassword(
+      final userCredential = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
+      
+      // Save user email/gmail to Realtime Database
+      if (userCredential.user != null) {
+        await _database
+            .child('users')
+            .child(userCredential.user!.uid)
+            .child('gmail')
+            .set(email);
+      }
       
       return true;
     } on FirebaseAuthException catch (e) {
