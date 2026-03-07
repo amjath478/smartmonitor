@@ -1,9 +1,29 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../config/app_config.dart';
+
+/// Configuration for AI Agent service
+class AIAgentConfig {
+  /// Base URL for AI Agent API (can be changed at runtime)
+  /// Defaults to value from AppConfig, but can be overridden
+  static String baseUrl = AppConfig.aiAgentBaseUrl;
+  
+  /// Set a new base URL (e.g., from environment or user config)
+  static void setBaseUrl(String url) {
+    baseUrl = url;
+  }
+  
+  /// Reset to default URL from AppConfig
+  static void resetBaseUrl() {
+    baseUrl = AppConfig.aiAgentBaseUrl;
+  }
+}
 
 class AIAgentService {
-  static const String _baseUrl = 'https://skirtless-irremeably-eldridge.ngrok-free.dev';
-  static const Duration _timeout = Duration(seconds: 30);
+  static Duration _timeout = Duration(seconds: AppConfig.aiAgentTimeoutSeconds);
+  
+  /// Note: Base URL is loaded from AppConfig and can be overridden at runtime
+  /// Change it at runtime with: AIAgentConfig.setBaseUrl('your-new-url')
 
   /// Send a message to the AI Agent
   /// 
@@ -16,7 +36,7 @@ class AIAgentService {
     try {
       final response = await http
           .post(
-            Uri.parse('$_baseUrl/ask-ai'),
+            Uri.parse('${AIAgentConfig.baseUrl}${AppConfig.aiAgentAskPath}'),
             headers: {
               'Content-Type': 'application/json',
             },

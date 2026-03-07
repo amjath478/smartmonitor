@@ -240,16 +240,53 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
             ),
           ),
           const SizedBox(height: 12),
-          // Original add appliance button
-          FloatingActionButton(
-            heroTag: 'addFab',
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (context) => const AddApplianceDialog(),
-              );
-            },
-            child: const Icon(Icons.add),
+          // Stylish add appliance button
+          Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                colors: [
+                  Theme.of(context).colorScheme.primary,
+                  Theme.of(context).colorScheme.secondary,
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Theme.of(context).colorScheme.primary.withOpacity(0.4),
+                  blurRadius: 16,
+                  spreadRadius: 2,
+                  offset: const Offset(0, 6),
+                ),
+                BoxShadow(
+                  color: Theme.of(context).colorScheme.secondary.withOpacity(0.2),
+                  blurRadius: 8,
+                  spreadRadius: 1,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () {
+                  showDialog(
+                    context: context,
+                    builder: (context) => const AddApplianceDialog(),
+                  );
+                },
+                customBorder: const CircleBorder(),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Icon(
+                    Icons.add_rounded,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+              ),
+            ),
           ),
         ],
       ),

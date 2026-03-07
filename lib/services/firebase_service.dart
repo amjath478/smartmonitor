@@ -267,6 +267,8 @@ class FirebaseService extends ChangeNotifier {
     final user = _auth.currentUser;
     if (user == null) return Stream.value([]);
 
+    // Use distinct to reduce rebuilds - only emit when appliance data
+    // meaningfully changes (not on every live update)
     return _database
         .child('users')
         .child(user.uid)
@@ -285,6 +287,16 @@ class FirebaseService extends ChangeNotifier {
         return [appliance];
       }
       return <Appliance>[];
+    })
+    .distinct((prev, next) {
+      // Only emit if the list changed (simple reference check)
+      if (prev.isEmpty && next.isEmpty) return true;
+      if (prev.isEmpty || next.isEmpty) return false;
+      // Compare appliances - use hashcode as a quick check
+      // (Note: For production, implement proper Appliance equality)
+      return prev[0].id == next[0].id &&
+             prev[0].config.hashCode == next[0].config.hashCode &&
+             prev[0].stats.hashCode == next[0].stats.hashCode;
     });
   }
   // ==============================
@@ -298,6 +310,9 @@ class FirebaseService extends ChangeNotifier {
     final user = _auth.currentUser;
     if (user == null) return Stream.value({});
 
+    // Use distinct with deep map equality to avoid emitting identical
+    // history maps when unrelated live fields update; this prevents
+    // unnecessary rebuilds and flicker in the history page.
     return _database
         .child('users')
         .child(user.uid)
@@ -314,12 +329,12 @@ class FirebaseService extends ChangeNotifier {
           event.snapshot.value as Map<dynamic, dynamic>,
         );
         return data.map((key, value) => MapEntry(
-          key,
-          (value is num) ? value.toDouble() : 0.0,
-        ));
+              key,
+              (value is num) ? value.toDouble() : 0.0,
+            ));
       }
       return <String, double>{};
-    });
+    }).distinct((prev, next) => mapEquals(prev, next));
   }
 
   // ==============================
@@ -349,12 +364,12 @@ class FirebaseService extends ChangeNotifier {
           event.snapshot.value as Map<dynamic, dynamic>,
         );
         return data.map((key, value) => MapEntry(
-          key,
-          (value is num) ? value.toDouble() : 0.0,
-        ));
+              key,
+              (value is num) ? value.toDouble() : 0.0,
+            ));
       }
       return <String, double>{};
-    });
+    }).distinct((prev, next) => mapEquals(prev, next));
   }
 // ==============================
 // UPDATE APPLIANCE CONFIG (FOR EDIT DIALOG)
@@ -399,11 +414,188 @@ Future<void> updateApplianceConfig({
 
 
   // ==============================
-  // SIMPLE REFRESH
+  // REFRESH DATA FROM FIREBASE
   // ==============================
 
   Future<void> refreshData() async {
-    notifyListeners();
+    try {
+      _setLoading(true);
+      _error = null;
+      
+      final user = _auth.currentUser;
+      if (user == null) {
+        _setLoading(false);
+        return;
+      }
+
+      // Force refresh from database by fetching devices
+      final snapshot = await _database
+          .child('users')
+          .child(user.uid)
+          .child('devices')
+          .get();
+
+      final data = snapshot.value as Map<dynamic, dynamic>?;
+      if (data == null) {
+        _devices = [];
+      } else {
+        final devices = <Device>[];
+        data.forEach((deviceKey, deviceValue) {
+          final deviceData = deviceValue as Map<dynamic, dynamic>?;
+          if (deviceData == null) return;
+
+          final appliances = <Appliance>[];
+          final appliancesData = deviceData['appliances'] as Map<dynamic, dynamic>?;
+
+          if (appliancesData != null) {
+            appliancesData.forEach((applianceKey, applianceValue) {
+              final applianceMap = Map<String, dynamic>.from(applianceValue as Map);
+              appliances.add(Appliance.fromMap(
+                applianceMap,
+                applianceKey.toString(),
+                deviceId: deviceKey.toString(),
+              ));
+            });
+          }
+
+          devices.add(Device(
+            id: deviceKey.toString(),
+            appliances: appliances,
+          ));
+        });
+        _devices = devices;
+      }
+      
+      _setLoading(false);
+      notifyListeners();
+    } catch (e) {
+      _error = 'Failed to refresh data: $e';
+      _setLoading(false);
+      notifyListeners();
+    }
+  }
+  
+  void _setLoading(bool loading) {
+    _isLoading = loading;
+  }
+
+  // ==============================
+  // CHAT MESSAGE PERSISTENCE
+  // ==============================
+
+  /// Save a chat message to Firebase
+  /// Messages are stored at: users/{uid}/chats/{messageId}
+  Future<bool> saveChatMessage({
+    required String userMessage,
+    required String aiResponse,
+    required DateTime timestamp,
+  }) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return false;
+
+      final messageId = _database.child('users').child(user.uid).child('chats').push().key;
+      if (messageId == null) return false;
+
+      await _database
+          .child('users')
+          .child(user.uid)
+          .child('chats')
+          .child(messageId)
+          .set({
+        'userMessage': userMessage,
+        'aiResponse': aiResponse,
+        'timestamp': timestamp.millisecondsSinceEpoch,
+      });
+
+      return true;
+    } catch (e) {
+      debugPrint('Error saving chat message: $e');
+      return false;
+    }
+  }
+
+  /// Retrieve chat history for current user
+  /// Returns messages in reverse chronological order (newest first)
+  Future<List<Map<String, dynamic>>> getChatHistory({int limit = 50}) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return [];
+
+      final snapshot = await _database
+          .child('users')
+          .child(user.uid)
+          .child('chats')
+          .orderByChild('timestamp')
+          .limitToLast(limit)
+          .get();
+
+      if (!snapshot.exists) return [];
+
+      final messages = <Map<String, dynamic>>[];
+      final data = snapshot.value as Map<dynamic, dynamic>;
+
+      // Convert to list and reverse to get newest first
+      data.forEach((key, value) {
+        if (value is Map<dynamic, dynamic>) {
+          messages.add({
+            'id': key,
+            'userMessage': value['userMessage'] ?? '',
+            'aiResponse': value['aiResponse'] ?? '',
+            'timestamp': DateTime.fromMillisecondsSinceEpoch(
+              (value['timestamp'] as int?) ?? 0,
+            ),
+          });
+        }
+      });
+
+      // Sort by timestamp descending (newest first)
+      messages.sort((a, b) => (b['timestamp'] as DateTime)
+          .compareTo(a['timestamp'] as DateTime));
+
+      return messages;
+    } catch (e) {
+      debugPrint('Error retrieving chat history: $e');
+      return [];
+    }
+  }
+
+  /// Delete a chat message by ID
+  Future<bool> deleteChatMessage(String messageId) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return false;
+
+      await _database
+          .child('users')
+          .child(user.uid)
+          .child('chats')
+          .child(messageId)
+          .remove();
+
+      return true;
+    } catch (e) {
+      debugPrint('Error deleting chat message: $e');
+      return false;
+    }
+  }
+
+  /// Clear all chat history for current user
+  Future<bool> clearChatHistory() async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return false;
+
+      await _database
+          .child('users')
+          .child(user.uid)
+          .child('chats')
+          .remove();
+
+      return true;
+    } catch (e) {
+      debugPrint('Error clearing chat history: $e');
+      return false;
+    }
   }
 }
-

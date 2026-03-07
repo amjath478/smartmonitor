@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/chat_message.dart';
 import '../services/ai_agent_service.dart';
+import '../services/firebase_service.dart';
 
 class AIChatSheet extends StatefulWidget {
   final String userId;
@@ -16,6 +17,7 @@ class AIChatSheet extends StatefulWidget {
 
 class _AIChatSheetState extends State<AIChatSheet> with TickerProviderStateMixin {
   final AIAgentService _aiService = AIAgentService();
+  final FirebaseService _firebaseService = FirebaseService();
   final TextEditingController _messageController = TextEditingController();
   final List<ChatMessage> _messages = [];
   final ScrollController _scrollController = ScrollController();
@@ -30,6 +32,7 @@ class _AIChatSheetState extends State<AIChatSheet> with TickerProviderStateMixin
       duration: const Duration(milliseconds: 600),
       vsync: this,
     )..repeat();
+    _loadChatHistory();
   }
 
   @override
@@ -40,15 +43,45 @@ class _AIChatSheetState extends State<AIChatSheet> with TickerProviderStateMixin
     super.dispose();
   }
 
+  /// Load chat history from Firebase
+  Future<void> _loadChatHistory() async {
+    try {
+      final history = await _firebaseService.getChatHistory(limit: 50);
+      if (mounted) {
+        setState(() {
+          _messages.clear();
+          for (final msg in history.reversed) {
+            // Add user message first
+            _messages.add(ChatMessage(
+              text: msg['userMessage'] ?? '',
+              isUser: true,
+              timestamp: msg['timestamp'] ?? DateTime.now(),
+            ));
+            // Then add AI response
+            _messages.add(ChatMessage(
+              text: msg['aiResponse'] ?? '',
+              isUser: false,
+              timestamp: msg['timestamp'] ?? DateTime.now(),
+            ));
+          }
+        });
+        _scrollToBottom();
+      }
+    } catch (e) {
+      debugPrint('Error loading chat history: $e');
+    }
+  }
+
   Future<void> _sendMessage() async {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
 
+    final userTimestamp = DateTime.now();
     setState(() {
       _messages.add(ChatMessage(
         text: text,
         isUser: true,
-        timestamp: DateTime.now(),
+        timestamp: userTimestamp,
       ));
       _isLoading = true;
     });
@@ -63,14 +96,23 @@ class _AIChatSheetState extends State<AIChatSheet> with TickerProviderStateMixin
       );
 
       if (mounted) {
+        final aiTimestamp = DateTime.now();
         setState(() {
           _messages.add(ChatMessage(
             text: reply,
             isUser: false,
-            timestamp: DateTime.now(),
+            timestamp: aiTimestamp,
           ));
           _isLoading = false;
         });
+
+        // Save message exchange to Firebase
+        await _firebaseService.saveChatMessage(
+          userMessage: text,
+          aiResponse: reply,
+          timestamp: userTimestamp,
+        );
+
         _scrollToBottom();
       }
     } catch (e) {
@@ -533,6 +575,56 @@ class _AIChatSheetState extends State<AIChatSheet> with TickerProviderStateMixin
     }
   }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 double sin(double x) {
   const double pi = 3.14159265358979323846;

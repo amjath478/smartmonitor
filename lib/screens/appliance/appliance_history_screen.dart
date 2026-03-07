@@ -37,263 +37,94 @@ class _ApplianceHistoryScreenState extends State<ApplianceHistoryScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Status & Forecast section
+              // Wrap status widget in RepaintBoundary to prevent live data
+              // updates from triggering expensive repaints in the page below
+              RepaintBoundary(
+                child: _ApplianceStatusWidget(
+                  deviceId: widget.appliance.deviceId ?? '',
+                  applianceId: widget.appliance.id,
+                  historyType: _historyType,
+                ),
+              ),
+          
+              // Energy History Section with custom buttons
+              const SizedBox(height: 12),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                child: Text(
+                  'Energy History',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+              ),
               Consumer<FirebaseService>(
                 builder: (context, firebaseService, child) {
-                  return StreamBuilder<List<Device>>(
-                    stream: firebaseService.getDevicesStream(),
-                    initialData: const [],
-                    builder: (context, snapshot) {
-                      // locate current appliance
-                      Appliance? currentAppliance;
-                      for (final device in snapshot.data ?? []) {
-                        final found = device.appliances.firstWhere(
-                          (app) => app.id == widget.appliance.id,
-                          orElse: () => widget.appliance,
-                        );
-                        if (found.id == widget.appliance.id) {
-                          currentAppliance = found;
-                          break;
-                        }
-                      }
-                      currentAppliance ??= widget.appliance;
-
-                      // status card widget
-                      final statusCard = Container(
-                        width: double.infinity,
-                        margin: const EdgeInsets.all(16),
-                        child: Card(
-                          color: currentAppliance.peak
-                              ? AppTheme.errorColor.withOpacity(0.1)
-                              : null,
-                          child: Padding(
-                            padding: const EdgeInsets.all(20),
-                            child: Column(
-                              children: [
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      'Current Status',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .titleLarge,
-                                    ),
-                                    if (currentAppliance.peak)
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 12,
-                                          vertical: 6,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: AppTheme.errorColor,
-                                          borderRadius:
-                                              BorderRadius.circular(16),
-                                        ),
-                                        child: const Text(
-                                          'PEAK ALERT',
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                                const SizedBox(height: 16),
-                                Column(
-                                  children: [
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceAround,
-                                      children: [
-                                        _StatusItem(
-                                          icon: Icons.electric_bolt,
-                                          label: 'Current',
-                                          value:
-                                              '${currentAppliance.live.current.toStringAsFixed(2)} A',
-                                          color: currentAppliance.peak
-                                              ? AppTheme.errorColor
-                                              : AppTheme.primaryColor,
-                                        ),
-                                        _StatusItem(
-                                          icon: Icons.flash_on,
-                                          label: 'Power',
-                                          value:
-                                              '${currentAppliance.live.power.toStringAsFixed(0)} W',
-                                          color: Colors.orange,
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 12),
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceAround,
-                                      children: [
-                                        _StatusItem(
-                                          icon: Icons.bolt,
-                                          label: 'Today',
-                                          value:
-                                              '${currentAppliance.stats.todayEnergy.toStringAsFixed(2)} kWh',
-                                          color: Colors.green,
-                                        ),
-                                        _StatusItem(
-                                          icon: Icons.calendar_month,
-                                          label: 'Month',
-                                          value:
-                                              '${currentAppliance.stats.monthEnergy.toStringAsFixed(2)} kWh',
-                                          color: Colors.blue,
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      );
-
-                      final forecastCard = PredictionCard(
-                        deviceId: widget.appliance.deviceId ?? '',
-                        applianceId: widget.appliance.id,
-                        historyType: _historyType,
-                      );
-
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                  return Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        child: Row(
                           children: [
-                            LayoutBuilder(
-                              builder: (context, constraints) {
-                                if (constraints.maxWidth > 600) {
-                                  return Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Expanded(child: statusCard),
-                                      const SizedBox(width: 12),
-                                      Expanded(child: forecastCard),
-                                    ],
-                                  );
-                                } else {
-                                  return Column(
-                                    children: [
-                                      statusCard,
-                                      const SizedBox(height: 8),
-                                      forecastCard,
-                                    ],
-                                  );
-                                }
-                              },
-                            ),
-                            const SizedBox(height: 12),
-                            Center(
+                            Expanded(
                               child: ElevatedButton.icon(
-                                icon: const Icon(Icons.eco),
-                                label: const Text('Environmental Impact'),
+                                icon: const Icon(Icons.calendar_today),
+                                label: const Text('Daily'),
                                 style: ElevatedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 24, vertical: 12),
+                                  backgroundColor: _historyType == 'daily'
+                                      ? AppTheme.primaryColor
+                                      : AppTheme.primaryColor.withOpacity(0.1),
+                                  foregroundColor: _historyType == 'daily'
+                                      ? Colors.white
+                                      : AppTheme.primaryColor,
                                 ),
                                 onPressed: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => CarbonImpactScreen(
-                                        deviceId: widget.appliance.deviceId ?? '',
-                                        applianceId: widget.appliance.id,
-                                      ),
-                                    ),
-                                  );
+                                  setState(() => _historyType = 'daily');
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                icon: const Icon(Icons.calendar_month),
+                                label: const Text('Monthly'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: _historyType == 'monthly'
+                                      ? AppTheme.primaryColor
+                                      : AppTheme.primaryColor.withOpacity(0.1),
+                                  foregroundColor: _historyType == 'monthly'
+                                      ? Colors.white
+                                      : AppTheme.primaryColor,
+                                ),
+                                onPressed: () {
+                                  setState(() => _historyType = 'monthly');
                                 },
                               ),
                             ),
                           ],
                         ),
-                      );
-                    },
+                      ),
+                      // History Content
+                      _historyType == 'daily'
+                          ? _buildDailyHistory(context, firebaseService)
+                          : _buildMonthlyHistory(context, firebaseService),
+                    ],
                   );
                 },
               ),
-          
-          // Energy History Section with custom buttons
-          const SizedBox(height: 12),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            child: Text(
-              'Energy History',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
+            ],
           ),
-          Consumer<FirebaseService>(
-            builder: (context, firebaseService, child) {
-              return Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            icon: const Icon(Icons.calendar_today),
-                            label: const Text('Daily'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _historyType == 'daily'
-                                  ? AppTheme.primaryColor
-                                  : AppTheme.primaryColor.withOpacity(0.1),
-                              foregroundColor: _historyType == 'daily'
-                                  ? Colors.white
-                                  : AppTheme.primaryColor,
-                            ),
-                            onPressed: () {
-                              setState(() => _historyType = 'daily');
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            icon: const Icon(Icons.calendar_month),
-                            label: const Text('Monthly'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _historyType == 'monthly'
-                                  ? AppTheme.primaryColor
-                                  : AppTheme.primaryColor.withOpacity(0.1),
-                              foregroundColor: _historyType == 'monthly'
-                                  ? Colors.white
-                                  : AppTheme.primaryColor,
-                            ),
-                            onPressed: () {
-                              setState(() => _historyType = 'monthly');
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  // History Content
-                  _historyType == 'daily'
-                      ? _buildDailyHistory(context, firebaseService)
-                      : _buildMonthlyHistory(context, firebaseService),
-                ],
-              );
-            },
-          ),
-        ],
+        ),
       ),
-    ),
-  ),
-); // end Scaffold
-}
+    ); // end Scaffold
+  }
 
 /// Build daily energy chart (last 7 days)
   Widget _buildDailyChart(Map<String, double> data) {
     if (data.isEmpty) {
       return _buildEmptyChartPlaceholder('Not enough data for chart');
     }
+
+    // we include a key so that AnimatedSwitcher knows when data changes
+    final chartKey = ValueKey(data.hashCode);
 
     // Parse and sort dates; keep only last 7 days
     final entries = data.entries.toList();
@@ -328,6 +159,7 @@ class _ApplianceHistoryScreenState extends State<ApplianceHistoryScreen> {
     });
 
     return Container(
+      key: chartKey,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
         color: Colors.white,
@@ -446,6 +278,8 @@ class _ApplianceHistoryScreenState extends State<ApplianceHistoryScreen> {
       return _buildEmptyChartPlaceholder('Not enough data for chart');
     }
 
+    final chartKey = ValueKey(data.hashCode);
+
     // Parse and sort by month; keep last 6 months
     final entries = data.entries.toList();
     final sortedEntries = entries
@@ -486,6 +320,7 @@ class _ApplianceHistoryScreenState extends State<ApplianceHistoryScreen> {
     });
 
     return Container(
+      key: chartKey,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
         color: Colors.white,
@@ -702,7 +537,12 @@ class _ApplianceHistoryScreenState extends State<ApplianceHistoryScreen> {
           children: [
             Padding(
               padding: const EdgeInsets.all(16),
-              child: _buildDailyChart(data),
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 400),
+                switchInCurve: Curves.easeInOut,
+                switchOutCurve: Curves.easeInOut,
+                child: _buildDailyChart(data),
+              ),
             ),
             const Padding(
               padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
@@ -819,7 +659,12 @@ class _ApplianceHistoryScreenState extends State<ApplianceHistoryScreen> {
           children: [
             Padding(
               padding: const EdgeInsets.all(16),
-              child: _buildMonthlyChart(data),
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 400),
+                switchInCurve: Curves.easeInOut,
+                switchOutCurve: Curves.easeInOut,
+                child: _buildMonthlyChart(data),
+              ),
             ),
             const Padding(
               padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
@@ -1130,6 +975,202 @@ class PredictionCard extends StatelessWidget {
               ],
             ),
           ),
+        );
+      },
+    );
+  }
+}
+
+// ==============================
+// ISOLATED STATUS WIDGET
+// ==============================
+// This widget rebuilds independently when appliance data changes,
+// preventing the parent page from flickering due to status updates.
+
+class _ApplianceStatusWidget extends StatelessWidget {
+  final String deviceId;
+  final String applianceId;
+  final String historyType;
+
+  const _ApplianceStatusWidget({
+    required this.deviceId,
+    required this.applianceId,
+    required this.historyType,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<FirebaseService>(
+      builder: (context, firebaseService, child) {
+        return StreamBuilder<List<Appliance>>(
+          // Listen only to this specific appliance, not all devices
+          stream: firebaseService.getApplianceHistoryStream(deviceId, applianceId),
+          initialData: const [],
+          builder: (context, snapshot) {
+            final currentAppliance = snapshot.data?.isNotEmpty == true
+                ? snapshot.data!.first
+                : null;
+
+            if (currentAppliance == null) {
+              return const SizedBox.shrink();
+            }
+
+            // status card widget
+            final statusCard = Container(
+              width: double.infinity,
+              margin: const EdgeInsets.all(16),
+              child: Card(
+                color: currentAppliance.peak
+                    ? AppTheme.errorColor.withOpacity(0.1)
+                    : null,
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Current Status',
+                            style:
+                                Theme.of(context).textTheme.titleLarge,
+                          ),
+                          if (currentAppliance.peak)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppTheme.errorColor,
+                                borderRadius:
+                                    BorderRadius.circular(16),
+                              ),
+                              child: const Text(
+                                'PEAK ALERT',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment:
+                                MainAxisAlignment.spaceAround,
+                            children: [
+                              _StatusItem(
+                                icon: Icons.electric_bolt,
+                                label: 'Current',
+                                value:
+                                    '${currentAppliance.live.current.toStringAsFixed(2)} A',
+                                color: currentAppliance.peak
+                                    ? AppTheme.errorColor
+                                    : AppTheme.primaryColor,
+                              ),
+                              _StatusItem(
+                                icon: Icons.flash_on,
+                                label: 'Power',
+                                value:
+                                    '${currentAppliance.live.power.toStringAsFixed(0)} W',
+                                color: Colors.orange,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            mainAxisAlignment:
+                                MainAxisAlignment.spaceAround,
+                            children: [
+                              _StatusItem(
+                                icon: Icons.bolt,
+                                label: 'Today',
+                                value:
+                                    '${currentAppliance.stats.todayEnergy.toStringAsFixed(2)} kWh',
+                                color: Colors.green,
+                              ),
+                              _StatusItem(
+                                icon: Icons.calendar_month,
+                                label: 'Month',
+                                value:
+                                    '${currentAppliance.stats.monthEnergy.toStringAsFixed(2)} kWh',
+                                color: Colors.blue,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+
+            final forecastCard = PredictionCard(
+              deviceId: deviceId,
+              applianceId: applianceId,
+              historyType: historyType,
+            );
+
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      if (constraints.maxWidth > 600) {
+                        return Row(
+                          crossAxisAlignment:
+                              CrossAxisAlignment.start,
+                          children: [
+                            Expanded(child: statusCard),
+                            const SizedBox(width: 12),
+                            Expanded(child: forecastCard),
+                          ],
+                        );
+                      } else {
+                        return Column(
+                          children: [
+                            statusCard,
+                            const SizedBox(height: 8),
+                            forecastCard,
+                          ],
+                        );
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  Center(
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.eco),
+                      label: const Text('Environmental Impact'),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 24, vertical: 12),
+                      ),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => CarbonImpactScreen(
+                              deviceId: deviceId,
+                              applianceId: applianceId,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
         );
       },
     );

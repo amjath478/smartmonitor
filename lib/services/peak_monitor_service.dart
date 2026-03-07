@@ -55,13 +55,15 @@ class PeakMonitorService {
         if (!enabled) continue;
         if (current <= peak) continue;
 
-        final last = _lastAlert[name];
+        // Use composite key (deviceId + applianceName) to track alerts per device
+        final alertKey = '$devId:$name';
+        final last = _lastAlert[alertKey];
         // use 5‑minute cooldown to avoid repeated alerts for same appliance
         if (last != null && now.difference(last).inMinutes < 5) continue;
 
         // passed checks, fire notification
         debugPrint('Peak exceeded for $name on device $devId, triggering alert');
-        _lastAlert[name] = now;
+        _lastAlert[alertKey] = now;
         _notifier.triggerPeakAlert(devId, name);
       }
     }

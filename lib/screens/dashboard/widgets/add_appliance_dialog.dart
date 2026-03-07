@@ -46,17 +46,10 @@ class _AddApplianceDialogState extends State<AddApplianceDialog> {
       });
 
       final firebaseService = context.read<FirebaseService>();
-final voltage =
-    double.tryParse(_voltageController.text.trim()) ?? 230.0;
-
-final calibration =
-    double.tryParse(_calibrationController.text.trim()) ?? 1.0;
-
-final peakCurrent =
-    double.tryParse(_peakCurrentController.text.trim()) ?? 0.0;
-
-final gpioPin =
-    int.tryParse(_gpioPinController.text.trim()) ?? 0;
+      final voltage = double.parse(_voltageController.text.trim());
+      final calibration = double.parse(_calibrationController.text.trim());
+      final peakCurrent = double.parse(_peakCurrentController.text.trim());
+      final gpioPin = int.parse(_gpioPinController.text.trim());
       final enabled = _enabled;
 
       final success = await firebaseService.addAppliance(
@@ -111,6 +104,9 @@ final gpioPin =
                     if (value == null || value.isEmpty) {
                       return 'Please enter device ID';
                     }
+                    if (value.trim().isEmpty) {
+                      return 'Device ID cannot be only whitespace';
+                    }
                     return null;
                   },
                 ),
@@ -135,13 +131,21 @@ final gpioPin =
                   decoration: const InputDecoration(
                     labelText: 'Voltage (V)',
                     prefixIcon: Icon(Icons.flash_on),
+                    helperText: 'Typical: 100-240V',
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Please enter voltage';
                     }
-                    if (double.tryParse(value) == null) {
+                    final voltage = double.tryParse(value);
+                    if (voltage == null) {
                       return 'Please enter a valid number';
+                    }
+                    if (voltage < 10) {
+                      return 'Voltage must be at least 10V';
+                    }
+                    if (voltage > 500) {
+                      return 'Voltage cannot exceed 500V';
                     }
                     return null;
                   },
@@ -171,13 +175,21 @@ final gpioPin =
                   decoration: const InputDecoration(
                     labelText: 'Peak Current (A)',
                     prefixIcon: Icon(Icons.trending_up),
+                    helperText: 'Max safe current limit',
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Please enter peak current';
                     }
-                    if (double.tryParse(value) == null) {
+                    final current = double.tryParse(value);
+                    if (current == null) {
                       return 'Please enter a valid number';
+                    }
+                    if (current <= 0) {
+                      return 'Peak current must be greater than 0';
+                    }
+                    if (current > 100) {
+                      return 'Peak current should not exceed 100A';
                     }
                     return null;
                   },
@@ -189,13 +201,21 @@ final gpioPin =
                   decoration: const InputDecoration(
                     labelText: 'GPIO Pin',
                     prefixIcon: Icon(Icons.pin),
+                    helperText: 'ESP32: 0-39 (avoid 6-11, 16-17)',
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Please enter GPIO pin';
                     }
-                    if (int.tryParse(value) == null) {
+                    final pin = int.tryParse(value);
+                    if (pin == null) {
                       return 'Please enter a valid integer';
+                    }
+                    if (pin < 0 || pin > 39) {
+                      return 'GPIO pin must be 0-39 for ESP32';
+                    }
+                    if ([6, 7, 8, 9, 10, 11, 16, 17].contains(pin)) {
+                      return 'GPIO $pin is reserved for flash memory';
                     }
                     return null;
                   },
