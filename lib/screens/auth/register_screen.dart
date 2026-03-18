@@ -48,8 +48,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
       body: SafeArea(
         child: Consumer<AuthService>(
           builder: (context, authService, child) {
-            return Padding(
-              padding: const EdgeInsets.all(24.0),
+            final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+            return SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(24, 24, 24, bottomInset + 24),
               child: Form(
                 key: _formKey,
                 child: Column(
@@ -125,24 +126,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         return null;
                       },
                     ),
-                    if (authService.error != null) ...[
-                      const SizedBox(height: 16),
-                      Card(
-                        color: Theme.of(context).colorScheme.errorContainer,
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Text(
-                            authService.error!,
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.onErrorContainer,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
                     const SizedBox(height: 24),
                     FilledButton(
-                      onPressed: authService.isLoading ? null : _register,
+                      onPressed: authService.isLoading ? null : () async {
+                        await _register();
+                        if (authService.error != null && mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(authService.error!),
+                              backgroundColor: Theme.of(context).colorScheme.error,
+                              duration: const Duration(seconds: 3),
+                            ),
+                          );
+                        }
+                      },
                       child: authService.isLoading
                           ? const SizedBox(
                               height: 20,

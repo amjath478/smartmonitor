@@ -9,21 +9,34 @@ import 'screens/auth/register_screen.dart';
 import 'screens/auth/forgot_password_screen.dart';
 import 'screens/dashboard/dashboard_screen.dart';
 import 'theme/app_theme.dart';
+import 'services/peak_monitor_service.dart';
+import 'services/local_notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   try {
     if (Firebase.apps.isEmpty) {
-      // Use platform-default config (google-services.json / GoogleService-Info.plist)
       await Firebase.initializeApp();
     }
   } catch (e) {
-    // ignore duplicate-init or other non-fatal init errors
     debugPrint('Firebase init skipped: $e');
   }
 
+  // Initialize notification service
+  await LocalNotificationService().init();
+
   runApp(const MyApp());
+}
+
+// Global peak monitor instance
+PeakMonitorService? _globalPeakMonitor;
+
+void startPeakMonitor(BuildContext context) {
+  if (_globalPeakMonitor != null) return;
+  final firebaseService = Provider.of<FirebaseService>(context, listen: false);
+  _globalPeakMonitor = PeakMonitorService(firebaseService, LocalNotificationService());
+  _globalPeakMonitor?.start();
 }
 
 class MyApp extends StatelessWidget {
@@ -37,20 +50,26 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => FirebaseService()),
         ChangeNotifierProvider(create: (_) => ThemeService()),
       ],
-      child: Consumer<ThemeService>(
-        builder: (context, themeService, child) {
-          return MaterialApp(
-            title: 'Energy Monitor',
-            theme: AppTheme.lightTheme,
-            debugShowCheckedModeBanner: false,
-            darkTheme: AppTheme.darkTheme,
-            themeMode: themeService.themeMode,
-            home: const AuthWrapper(),
-            routes: {
-              '/login': (context) => const LoginScreen(),
-              '/register': (context) => const RegisterScreen(),
-              '/forgot-password': (context) => const ForgotPasswordScreen(),
-              '/dashboard': (context) => const DashboardScreen(),
+      child: Builder(
+        builder: (context) {
+          // Start peak monitor globally
+          startPeakMonitor(context);
+          return Consumer<ThemeService>(
+            builder: (context, themeService, child) {
+              return MaterialApp(
+                title: 'Energy Monitor',
+                theme: AppTheme.lightTheme,
+                debugShowCheckedModeBanner: false,
+                darkTheme: AppTheme.darkTheme,
+                themeMode: themeService.themeMode,
+                home: const AuthWrapper(),
+                routes: {
+                  '/login': (context) => const LoginScreen(),
+                  '/register': (context) => const RegisterScreen(),
+                  '/forgot-password': (context) => const ForgotPasswordScreen(),
+                  '/dashboard': (context) => const DashboardScreen(),
+                },
+              );
             },
           );
         },

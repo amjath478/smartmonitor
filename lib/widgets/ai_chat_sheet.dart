@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../models/chat_message.dart';
 import '../services/ai_agent_service.dart';
 import '../services/firebase_service.dart';
@@ -43,32 +44,77 @@ class _AIChatSheetState extends State<AIChatSheet> with TickerProviderStateMixin
     super.dispose();
   }
 
-  /// Load chat history from Firebase
+  /// Load today's chat history from Firebase
   Future<void> _loadChatHistory() async {
     try {
+      debugPrint('Loading chat history...');
       final history = await _firebaseService.getChatHistory(limit: 50);
+      debugPrint('Loaded ${history.length} chat entries from Firebase');
+      
       if (mounted) {
         setState(() {
           _messages.clear();
-          for (final msg in history.reversed) {
-            // Add user message first
-            _messages.add(ChatMessage(
-              text: msg['userMessage'] ?? '',
-              isUser: true,
-              timestamp: msg['timestamp'] ?? DateTime.now(),
-            ));
-            // Then add AI response
-            _messages.add(ChatMessage(
-              text: msg['aiResponse'] ?? '',
-              isUser: false,
-              timestamp: msg['timestamp'] ?? DateTime.now(),
-            ));
+
+          if (history.isEmpty) {
+            debugPrint('No chat history found for today');
+            // No messages - list will be empty and show empty state
+            return;
           }
+
+          // Process each chat entry and add messages without duplicates
+          final seenMessages = <String>{}; // Track message content + timestamp to prevent duplicates
+
+          for (final chatEntry in history) {
+            final timestamp = chatEntry['timestamp'];
+            final userMessage = chatEntry['userMessage']?.toString().trim() ?? '';
+            final aiResponse = chatEntry['aiResponse']?.toString().trim() ?? '';
+
+            debugPrint('Processing chat entry - User: "$userMessage", AI: "$aiResponse"');
+
+            // Create unique keys for deduplication
+            final userKey = '${userMessage}_${timestamp}_user';
+            final aiKey = '${aiResponse}_${timestamp}_ai';
+
+            // Add user message if not empty and not duplicate
+            if (userMessage.isNotEmpty && !seenMessages.contains(userKey)) {
+              _messages.add(ChatMessage(
+                text: userMessage,
+                isUser: true,
+                timestamp: timestamp != null
+                    ? DateTime.fromMillisecondsSinceEpoch(timestamp)
+                    : DateTime.now(),
+              ));
+              seenMessages.add(userKey);
+              debugPrint('Added user message: $userMessage');
+            }
+
+            // Add AI response if not empty and not duplicate
+            if (aiResponse.isNotEmpty && !seenMessages.contains(aiKey)) {
+              _messages.add(ChatMessage(
+                text: aiResponse,
+                isUser: false,
+                timestamp: timestamp != null
+                    ? DateTime.fromMillisecondsSinceEpoch(timestamp)
+                    : DateTime.now(),
+              ));
+              seenMessages.add(aiKey);
+              debugPrint('Added AI response: $aiResponse');
+            }
+          }
+
+          // Sort messages by timestamp to ensure chronological order
+          _messages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+          debugPrint('Total messages loaded: ${_messages.length}');
         });
         _scrollToBottom();
       }
     } catch (e) {
       debugPrint('Error loading chat history: $e');
+      if (mounted) {
+        setState(() {
+          _messages.clear();
+        });
+      }
     }
   }
 
@@ -395,8 +441,8 @@ class _AIChatSheetState extends State<AIChatSheet> with TickerProviderStateMixin
                                 ],
                               ),
                             )
-                          : ListView.builder(
-                              controller: scrollController,
+                            : ListView.builder(
+                              controller: _scrollController,
                               padding: EdgeInsets.fromLTRB(
                                 16,
                                 16,
@@ -453,62 +499,193 @@ class _AIChatSheetState extends State<AIChatSheet> with TickerProviderStateMixin
             constraints: BoxConstraints(
               maxWidth: MediaQuery.of(context).size.width * 0.75,
             ),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                gradient: message.isUser
-                    ? LinearGradient(
-                        colors: [
-                          Theme.of(context).colorScheme.primary,
-                          Theme.of(context).colorScheme.secondary,
+            child: GestureDetector(
+              onLongPress: () => _showMessageOptions(context, message),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  gradient: message.isUser
+                      ? LinearGradient(
+                          colors: [
+                            Theme.of(context).colorScheme.primary,
+                            Theme.of(context).colorScheme.secondary,
+                          ],
+                        )
+                      : null,
+                  color: message.isUser
+                      ? null
+                      : (Theme.of(context).brightness == Brightness.dark
+                          ? Colors.grey.shade800
+                          : Colors.grey.shade100),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: message.isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      message.text,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: message.isUser
+                                ? Colors.white
+                                : Theme.of(context).colorScheme.onSurface,
+                            height: 1.4,
+                          ),
+                    ),
+                    const SizedBox(height: 8),
+                    // Time and sent indicator row
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _formatTime(message.timestamp),
+                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                color: message.isUser
+                                    ? Colors.white70
+                                    : Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant
+                                        .withOpacity(0.6),
+                              ),
+                        ),
+                        if (message.isUser) ...[
+                          const SizedBox(width: 6),
+                          Icon(
+                            Icons.done_all,
+                            size: 14,
+                            color: Colors.white70,
+                          ),
                         ],
-                      )
-                    : null,
-                color: message.isUser
-                    ? null
-                    : (Theme.of(context).brightness == Brightness.dark
-                        ? Colors.grey.shade800
-                        : Colors.grey.shade100),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    message.text,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: message.isUser
-                              ? Colors.white
-                              : Theme.of(context).colorScheme.onSurface,
-                          height: 1.4,
-                        ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _formatTime(message.timestamp),
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: message.isUser
-                              ? Colors.white70
-                              : Theme.of(context)
-                                  .colorScheme
-                                  .onSurfaceVariant
-                                  .withOpacity(0.6),
-                        ),
-                  ),
-                ],
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
         ),
       ),
     );
+  }
+
+  /// Show message options (copy) on long press
+  void _showMessageOptions(BuildContext context, ChatMessage message) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext context) {
+        return Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.grey.shade900
+                : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.15),
+                blurRadius: 12,
+                offset: const Offset(0, -4),
+              ),
+            ],
+          ),
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Top indicator bar
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade400,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                    margin: const EdgeInsets.only(bottom: 20),
+                  ),
+                  // Copy button
+                  ListTile(
+                    leading: Icon(
+                      Icons.content_copy,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    title: Text(
+                      'Copy message',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w500,
+                          ),
+                    ),
+                    onTap: () {
+                      _copyToClipboard(message.text);
+                      Navigator.pop(context);
+                      // Show snackbar confirmation
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: const Text('Message copied to clipboard'),
+                          backgroundColor: Theme.of(context).colorScheme.primary,
+                          duration: const Duration(seconds: 2),
+                        ),
+                      );
+                    },
+                  ),
+                  const Divider(height: 1),
+                  // Message info
+                  ListTile(
+                    leading: Icon(
+                      Icons.info_outline,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                    title: Text(
+                      'Message info',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w500,
+                          ),
+                    ),
+                    subtitle: Text(
+                      'Sent: ${_formatFullDateTime(message.timestamp)}',
+                      style: Theme.of(context).textTheme.labelSmall,
+                    ),
+                    enabled: false,
+                  ),
+                  const SizedBox(height: 12),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Copy text to clipboard
+  Future<void> _copyToClipboard(String text) async {
+    await Clipboard.setData(ClipboardData(text: text));
+  }
+
+  /// Format full date time for message info
+  String _formatFullDateTime(DateTime dateTime) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final messageDate = DateTime(dateTime.year, dateTime.month, dateTime.day);
+
+    String dateStr;
+    if (messageDate == today) {
+      dateStr = 'Today';
+    } else if (messageDate == today.subtract(const Duration(days: 1))) {
+      dateStr = 'Yesterday';
+    } else {
+      dateStr = '${dateTime.day}/${dateTime.month}/${dateTime.year}';
+    }
+
+    return '$dateStr at ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
   }
 
   Widget _buildTypingIndicator() {

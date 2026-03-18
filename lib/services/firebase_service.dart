@@ -3,6 +3,12 @@
 // └── {uid}/
 //     ├── gmail:      {string}   // user email address (auto-saved on registration)
 //     │
+//     ├── chats/     // AI chat history
+//     │   └── {chatId}/
+//     │       ├── userMessage: {string}   // user's message
+//     │       ├── aiResponse:  {string}   // AI's response
+//     │       └── timestamp:   {number}   // milliseconds since epoch
+//     │
 //     └── devices/
 //         └── {espId}/
 //             └── appliances/
@@ -127,6 +133,42 @@ class FirebaseService extends ChangeNotifier {
     try {
       final user = _auth.currentUser;
       if (user == null) return false;
+
+      // Check if appliance already exists
+      final applianceSnapshot = await _database
+          .child('users')
+          .child(user.uid)
+          .child('devices')
+          .child(deviceId)
+          .child('appliances')
+          .child(applianceName)
+          .get();
+      if (applianceSnapshot.exists) {
+        _error = 'Appliance already exists under this device.';
+        notifyListeners();
+        return false;
+      }
+
+      // Check for duplicate gpioPin
+      final allAppliancesSnapshot = await _database
+          .child('users')
+          .child(user.uid)
+          .child('devices')
+          .child(deviceId)
+          .child('appliances')
+          .get();
+      if (allAppliancesSnapshot.exists) {
+        final appliancesMap = Map<String, dynamic>.from(allAppliancesSnapshot.value as Map);
+        for (final entry in appliancesMap.entries) {
+          final applianceData = Map<String, dynamic>.from(entry.value as Map);
+          final config = applianceData['config'] as Map?;
+          if (config != null && config['gpioPin'] != null && int.tryParse(config['gpioPin'].toString()) == gpioPin) {
+            _error = 'GPIO pin $gpioPin is already used by another appliance under this device.';
+            notifyListeners();
+            return false;
+          }
+        }
+      }
 
       final appliance = Appliance(
         id: applianceName,
@@ -517,47 +559,78 @@ Future<void> updateApplianceConfig({
     }
   }
 
-  /// Retrieve chat history for current user
-  /// Returns messages in reverse chronological order (newest first)
-  Future<List<Map<String, dynamic>>> getChatHistory({int limit = 50}) async {
+  /// Retrieve today's chat history for current user
+  /// Returns messages for current day only, in chronological order (oldest first)
+  /// Get today's chat history from Firebase
+  /// Returns list of chat messages for current day only
+  Future<List<Map<String, dynamic>>> getChatHistory({int? limit}) async {
     try {
       final user = _auth.currentUser;
-      if (user == null) return [];
+      if (user == null) {
+        debugPrint('No user logged in');
+        return [];
+      }
 
+      // Get today's date range
+      final now = DateTime.now();
+      final startOfDay = DateTime(now.year, now.month, now.day);
+      final endOfDay = startOfDay.add(const Duration(days: 1));
+
+      final startTimestamp = startOfDay.millisecondsSinceEpoch;
+      final endTimestamp = endOfDay.millisecondsSinceEpoch;
+
+      debugPrint('Fetching chats between $startTimestamp and $endTimestamp');
+
+      // Query all chats (Firebase doesn't always support complex queries reliably)
       final snapshot = await _database
           .child('users')
           .child(user.uid)
           .child('chats')
-          .orderByChild('timestamp')
-          .limitToLast(limit)
           .get();
 
-      if (!snapshot.exists) return [];
+      if (!snapshot.exists) {
+        debugPrint('No chats node found in Firebase');
+        return [];
+      }
 
-      final messages = <Map<String, dynamic>>[];
-      final data = snapshot.value as Map<dynamic, dynamic>;
+      final data = snapshot.value as Map<dynamic, dynamic>?;
+      if (data == null) {
+        debugPrint('Chat data is null');
+        return [];
+      }
 
-      // Convert to list and reverse to get newest first
-      data.forEach((key, value) {
-        if (value is Map<dynamic, dynamic>) {
-          messages.add({
-            'id': key,
-            'userMessage': value['userMessage'] ?? '',
-            'aiResponse': value['aiResponse'] ?? '',
-            'timestamp': DateTime.fromMillisecondsSinceEpoch(
-              (value['timestamp'] as int?) ?? 0,
-            ),
-          });
+      // Convert to list and filter by today + sort by timestamp
+      final chatList = <Map<String, dynamic>>[];
+      data.forEach((chatId, chatData) {
+        try {
+          if (chatData is Map<dynamic, dynamic>) {
+            final timestamp = chatData['timestamp'] as int?;
+            
+            // Filter by today's date
+            if (timestamp != null && timestamp >= startTimestamp && timestamp < endTimestamp) {
+              final chatMap = Map<String, dynamic>.from(chatData);
+              chatMap['chatId'] = chatId;
+              chatList.add(chatMap);
+            }
+          }
+        } catch (e) {
+          debugPrint('Error processing chat entry $chatId: $e');
         }
       });
 
-      // Sort by timestamp descending (newest first)
-      messages.sort((a, b) => (b['timestamp'] as DateTime)
-          .compareTo(a['timestamp'] as DateTime));
+      // Sort by timestamp (oldest first)
+      chatList.sort((a, b) => (a['timestamp'] ?? 0).compareTo(b['timestamp'] ?? 0));
 
-      return messages;
+      debugPrint('Found ${chatList.length} chats for today');
+
+      // Apply limit if specified
+      if (limit != null && chatList.length > limit) {
+        return chatList.sublist(chatList.length - limit);
+      }
+
+      return chatList;
     } catch (e) {
-      debugPrint('Error retrieving chat history: $e');
+      debugPrint('Error loading chat history: $e');
       return [];
     }
   }
@@ -578,25 +651,6 @@ Future<void> updateApplianceConfig({
       return true;
     } catch (e) {
       debugPrint('Error deleting chat message: $e');
-      return false;
-    }
-  }
-
-  /// Clear all chat history for current user
-  Future<bool> clearChatHistory() async {
-    try {
-      final user = _auth.currentUser;
-      if (user == null) return false;
-
-      await _database
-          .child('users')
-          .child(user.uid)
-          .child('chats')
-          .remove();
-
-      return true;
-    } catch (e) {
-      debugPrint('Error clearing chat history: $e');
       return false;
     }
   }

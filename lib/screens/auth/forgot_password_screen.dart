@@ -37,6 +37,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Clear error when opening
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authService = context.read<AuthService>();
+      if (authService.error != null) {
+        authService.setError(null);
+      }
+    });
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Reset Password'),
@@ -77,23 +85,19 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                         },
                       ),
                       const SizedBox(height: 24),
-                      if (authService.error != null) ...[
-                        Card(
-                          color: Theme.of(context).colorScheme.errorContainer,
-                          child: Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Text(
-                              authService.error!,
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.onErrorContainer,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                      ],
                       FilledButton(
-                        onPressed: authService.isLoading ? null : _sendResetEmail,
+                        onPressed: authService.isLoading ? null : () async {
+                          await _sendResetEmail();
+                          if (authService.error != null && mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(authService.error!),
+                                backgroundColor: Theme.of(context).colorScheme.error,
+                                duration: const Duration(seconds: 3),
+                              ),
+                            );
+                          }
+                        },
                         child: authService.isLoading
                             ? const SizedBox(
                                 height: 20,

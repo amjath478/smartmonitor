@@ -29,7 +29,7 @@ class AuthService extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _setError(String? error) {
+  void setError(String? error) {
     _error = error;
     notifyListeners();
   }
@@ -37,7 +37,7 @@ class AuthService extends ChangeNotifier {
   Future<bool> signInWithEmailAndPassword(String email, String password) async {
     try {
       _setLoading(true);
-      _setError(null);
+      setError(null);
       
       await _auth.signInWithEmailAndPassword(
         email: email,
@@ -46,10 +46,10 @@ class AuthService extends ChangeNotifier {
       
       return true;
     } on FirebaseAuthException catch (e) {
-      _setError(_getErrorMessage(e.code));
+      setError(_getErrorMessage(e.code));
       return false;
     } catch (e) {
-      _setError('An unexpected error occurred');
+      setError('An unexpected error occurred');
       return false;
     } finally {
       _setLoading(false);
@@ -59,7 +59,7 @@ class AuthService extends ChangeNotifier {
   Future<bool> createUserWithEmailAndPassword(String email, String password) async {
     try {
       _setLoading(true);
-      _setError(null);
+      setError(null);
       
       final userCredential = await _auth.createUserWithEmailAndPassword(
         email: email,
@@ -77,10 +77,10 @@ class AuthService extends ChangeNotifier {
       
       return true;
     } on FirebaseAuthException catch (e) {
-      _setError(_getErrorMessage(e.code));
+      setError(_getErrorMessage(e.code));
       return false;
     } catch (e) {
-      _setError('An unexpected error occurred');
+      setError('An unexpected error occurred');
       return false;
     } finally {
       _setLoading(false);
@@ -90,16 +90,16 @@ class AuthService extends ChangeNotifier {
   Future<bool> sendPasswordResetEmail(String email) async {
     try {
       _setLoading(true);
-      _setError(null);
+      setError(null);
       
       await _auth.sendPasswordResetEmail(email: email);
       
       return true;
     } on FirebaseAuthException catch (e) {
-      _setError(_getErrorMessage(e.code));
+      setError(_getErrorMessage(e.code));
       return false;
     } catch (e) {
-      _setError('An unexpected error occurred');
+      setError('An unexpected error occurred');
       return false;
     } finally {
       _setLoading(false);
